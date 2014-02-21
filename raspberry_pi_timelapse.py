@@ -19,11 +19,8 @@ LOGGING_LEVELS = {'critical': logging.CRITICAL,
 
 PREFIX = "flow_"
 TIMELAPSE_FILENAME = "timelapse.mp4"
-global FRAMES
 global FPS_IN
 global TIMESTAMP_IMAGE_DIR
-global DEMO_MODE
-global OVERRIDE
 FPS_IN = 10
 FPS_OUT = 24
 TIMEBETWEEN = 15 # 4 pictures per minute
@@ -33,6 +30,8 @@ def main():
   global FRAMES
   global DEMO_MODE
   global OVERRIDE
+  global SCP
+  global CLEANING
 
   # optparse is deprecated since 2.7, use argparse
   parser = optparse.OptionParser()
@@ -41,6 +40,8 @@ def main():
   parser.add_option('-x', '--frames', help='Frames to catch')
   parser.add_option('-d', '--demo', help='Demo mode', action='store_true', default=False)
   parser.add_option('-o', '--override', help='Overrides taken image with timestamp image', action='store_true', default=False)
+  parser.add_option('-s', '--scp', help='Transfer timelapse to another machine', action='store_true', default=False)
+  parser.add_option('-c', '--clean', help='Cleaning images and timestamp images alike', action='store_true', default=False)
   (options, args) = parser.parse_args()
   logging_level = LOGGING_LEVELS.get(options.logging_level, logging.NOTSET)
   logging.basicConfig(level=logging_level, filename=options.logging_file,
@@ -58,6 +59,8 @@ def main():
 
   DEMO_MODE = options.demo
   OVERRIDE = options.override
+  SCP = options.scp
+  CLEANING = options.clean   
 
   # Your program goes here.
   # You can access command-line arguments using the args variable.
@@ -93,11 +96,19 @@ def creatingTimelapse(image_dir):
   logging.info("Prefix: %s" % (PREFIX))
   logging.info("Timelapse filename: %s" % (TIMELAPSE_FILENAME))
   # Actual image is 2592x1944
-  #os.system("nice -n 19 avconv -r %s -i %s/%simage%s.jpg -r %s -vcodec libx264 -crf 20 -g 15 -vf crop=2592:1458,scale=1280:720 %s"%(FPS_IN, image_dir, PREFIX, '%7d',FPS_OUT,TIMELAPSE_FILENAME))
+  #os.system("nice -n 19 avconv -r %s -i %s/%simage%s.jpg -r %s -vcodec libx264 -crf 20 -g 15 -vf crop=2592:1458,scale=1280:720 %s"%(FPS_IN, image_dir, PREFIX, '%07d',FPS_OUT,TIMELAPSE_FILENAME))
   # added -y to override latest timelapse if exists
-  os.system("nice -n 19 avconv -y -r %s -i %s/%simage%s.jpg -r %s -vcodec libx264 -crf 20 -g 15 -vf scale=1280:720 %s"%(FPS_IN, image_dir, PREFIX, '%7d',FPS_OUT,TIMELAPSE_FILENAME))
+  os.system("nice -n 19 avconv -y -r %s -i %s/%simage%s.jpg -r %s -vcodec libx264 -crf 20 -g 15 -vf scale=1280:720 %s"%(FPS_IN, image_dir, PREFIX, '%07d',FPS_OUT,TIMELAPSE_FILENAME))
 
   logging.debug("end creatingTimelapse(%s)"%(image_dir))
+
+def scp():
+  logging.debug("begin scp()")
+ 
+  logging.info("Transfering timelapse...")
+  os.system("scp -i %s %s %s"%("/home/pi/.ssh/ida_dsa", TIMELAPSE_FILENAME, "user@ip:~/"))
+  
+  logging.debug("end scp()")
 
 def cleaning():
   logging.debug("begin cleaning()")
@@ -214,4 +225,8 @@ if __name__ == '__main__':
   takingPhotos()
   timestampPhotos()
   creatingTimelapse(TIMESTAMP_IMAGE_DIR)
-  cleaning()
+  if SCP is True:
+    scp()
+
+  if CLEANING is True:
+    cleaning()
