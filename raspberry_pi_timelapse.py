@@ -1,17 +1,14 @@
+# timelapse_flow.py -l debug -f debug.log -x 1920
+
 import logging
 import optparse
 import os
 import time
 import sys
 
-#timestampf
+#timestamp
 from PIL import Image, ImageDraw, ImageFont  
 from PIL.ExifTags import TAGS  
-
-# http://startgrid.blogspot.de/2012/08/tutorial-creating-timestamp-on.html
-# http://trevorappleton.blogspot.de/2013/11/creating-time-lapse-camera-with.html
-# http://web.archive.org/web/20120819135307/http://aymanh.com/python-debugging-techniques
-# timelapse_flow.py -l debug -f debug.log
 
 # CRITICAL < ERROR < WARNING < INFO < DEBUG < NOTSET
 LOGGING_LEVELS = {'critical': logging.CRITICAL,
@@ -25,6 +22,8 @@ TIMELAPSE_FILENAME = "timelapse.mp4"
 global FRAMES
 global FPS_IN
 global TIMESTAMP_IMAGE_DIR
+global DEMO_MODE
+global OVERRIDE
 FPS_IN = 10
 FPS_OUT = 24
 TIMEBETWEEN = 15 # 4 pictures per minute
@@ -32,58 +31,61 @@ global FILMLENGTH
 
 def main():
   global FRAMES
+  global DEMO_MODE
+  global OVERRIDE
+
+  # optparse is deprecated since 2.7, use argparse
   parser = optparse.OptionParser()
   parser.add_option('-l', '--logging-level', help='Logging level')
   parser.add_option('-f', '--logging-file', help='Logging file name')
   parser.add_option('-x', '--frames', help='Frames to catch')
+  parser.add_option('-d', '--demo', help='Demo mode', action='store_true', default=False)
+  parser.add_option('-o', '--override', help='Overrides taken image with timestamp image', action='store_true', default=False)
   (options, args) = parser.parse_args()
   logging_level = LOGGING_LEVELS.get(options.logging_level, logging.NOTSET)
   logging.basicConfig(level=logging_level, filename=options.logging_file,
                       format='%(asctime)s %(levelname)s: %(message)s',
                       datefmt='%Y-%m-%d %H:%M:%S')
 
-  logging.debug("begin main()")
+  logging.info("begin main()")
   
-  logging.info("Options: %s"%(options))
+  logging.debug("Options: %s"%(options))
 
   if options.frames is None:
     FRAMES = 1920 # 4/m * 60m *8h 
   else:
     FRAMES = int(options.frames)
 
+  DEMO_MODE = options.demo
+  OVERRIDE = options.override
+
   # Your program goes here.
   # You can access command-line arguments using the args variable.
-  logging.debug("end main()")
+  logging.info("end main()")
   
 def takingPhotos():
   FILMLENGTH = float(FRAMES / FPS_IN)
-  logging.debug("begin takingPhotos()")
-  logging.info("Frames: %s" % (FRAMES))
-  logging.info("FPS in: %s" % (FPS_IN))
-  logging.info("FPS out: %s" % (FPS_OUT))
-  logging.info("Time between pictures: %s" % (TIMEBETWEEN))
-  logging.info("Length of film: %s" % (FILMLENGTH))
+  logging.info("begin takingPhotos()")
+  logging.debug("Frames: %s" % (FRAMES))
+  logging.debug("FPS in: %s" % (FPS_IN))
+  logging.debug("FPS out: %s" % (FPS_OUT))
+  logging.debug("Time between pictures: %s" % (TIMEBETWEEN))
+  logging.debug("Length of film: %s" % (FILMLENGTH))
 
   frameCount = 1
   while frameCount < FRAMES+1:
     imageNumber = str(frameCount).zfill(7)
-    logging.info("Image number: %s" % imageNumber)
-    """
-    try:
-      #os.system("raspistill -o image%s.jpg" % (imageNumber))
-    except Exception, e:
-      logging.error(e)
-    """
-    """
-    except:
-      etype, evalue, etb = sys.exc_info()
-      evalue = etype("Cannot execute command: %s" % evalue)
-      raise etype, evalue, etb
-    """
+    logging.debug("Image number: %s" % imageNumber)
+    if DEMO_MODE is False:
+      try:
+        os.system("raspistill -o image%s.jpg" % (imageNumber))
+      except Exception, e:
+        logging.error(e)
+
     frameCount += 1
     time.sleep(TIMEBETWEEN - 7) #Takes roughly 6 seconds to take a picture, 7 seconds on a USB drive
   
-  logging.debug("end takingPhotos()")
+  logging.info("end takingPhotos()")
 
 def creatingTimelapse(image_dir):
   logging.debug("begin creatingTimelapse(%s)"%(image_dir))
@@ -92,14 +94,20 @@ def creatingTimelapse(image_dir):
   logging.info("Timelapse filename: %s" % (TIMELAPSE_FILENAME))
   # Actual image is 2592x1944
   #os.system("nice -n 19 avconv -r %s -i %s/%simage%s.jpg -r %s -vcodec libx264 -crf 20 -g 15 -vf crop=2592:1458,scale=1280:720 %s"%(FPS_IN, image_dir, PREFIX, '%7d',FPS_OUT,TIMELAPSE_FILENAME))
-  os.system("nice -n 19 avconv -r %s -i %s/%simage%s.jpg -r %s -vcodec libx264 -crf 20 -g 15 -vf scale=1280:720 %s"%(FPS_IN, image_dir, PREFIX, '%7d',FPS_OUT,TIMELAPSE_FILENAME))
+  # added -y to override latest timelapse if exists
+  os.system("nice -n 19 avconv -y -r %s -i %s/%simage%s.jpg -r %s -vcodec libx264 -crf 20 -g 15 -vf scale=1280:720 %s"%(FPS_IN, image_dir, PREFIX, '%7d',FPS_OUT,TIMELAPSE_FILENAME))
 
   logging.debug("end creatingTimelapse(%s)"%(image_dir))
 
 def cleaning():
   logging.debug("begin cleaning()")
+
+  logging.info("Cleaning up...")
   
-  os.system("nice -n 19 rm -Rf %simage*.jpg"%(PREFIX))
+  if OVERRIDE is False:
+    os.system("nice -n 19 rm -Rf %s"%(TIMESTAMP_IMAGE_DIR))
+
+  os.system("nice -n 19 rm -Rf *image*.jpg")
   
   logging.debug("end cleaning()")
 
@@ -123,7 +131,7 @@ def get_exif(fn):
 
 def get_datetime(fn):  
   '''returns string of year, month, day, hour, minute and second'''  
-  logging.debug("begin get_datetime(%s)"%(fn))
+  logging.info("begin get_datetime(%s)"%(fn))
 
   try:  
     raw = get_exif(fn)['DateTime']  
@@ -135,11 +143,12 @@ def get_datetime(fn):
         str(date['year']) + ' ' + str(date['hour']) + ':' + \
         str(date['minute']) # format timestamp 
 
-  logging.debug("end get_datetime(%s) -> %s"%(fn,datetime)) 
+  logging.info("end get_datetime(%s) -> %s"%(fn,datetime)) 
   return datetime
 
 def timestampPhotos():
   global TIMESTAMP_IMAGE_DIR
+
   logging.info("begin timestampPhotos()")
 
   maindir = os.getcwd() # current working dir  
@@ -157,18 +166,25 @@ def timestampPhotos():
   myfont = ImageFont.truetype ( fontPath, imgwidth/40 ) # load font and size  
   (textw, texth) = myfont.getsize('00-00-0000 00:00')  # get size of timestamp  
   x = imgwidth - textw - 50  # position of text  
-  y = imgheight - texth - 50  
-  print 'Now creating',str(len(fileList)),'frames in folder', \
-    time.strftime('"Frames_%Y%m%d_%H%M%S".', time.localtime())  
-  # make new dir  
-  newdir = os.path.join(maindir, time.strftime("Frames_%Y%m%d_%H%M%S", time.localtime()))
-  TIMESTAMP_IMAGE_DIR = newdir
-  os.mkdir(newdir)
+  y = imgheight - texth - 50
 
+  if OVERRIDE is False:
+    print 'Now creating',str(len(fileList)),'frames in folder', \
+      time.strftime('"Frames_%Y%m%d_%H%M%S".', time.localtime())  
+    # make new dir  
+    newdir = os.path.join(maindir, time.strftime("Frames_%Y%m%d_%H%M%S", time.localtime()))
+    TIMESTAMP_IMAGE_DIR = newdir
+    os.mkdir(newdir)
+  else:
+    TIMESTAMP_IMAGE_DIR = maindir
+    logging.debug("Now creating %s timestamp images in current folder"%(str(len(fileList))))
+  
+  # sorting file list alphabetical
   fileList.sort()
 
   for n in range(0,len(fileList)):  
-    i = Image.open(fileList[n]) # open image from list  
+    # open image from list
+    i = Image.open(fileList[n])  
     draw = ImageDraw.Draw ( i )  
     # thin border  
     draw.text((x-1, y-1), get_datetime(fileList[n]), font=myfont, fill='black')  
@@ -176,24 +192,26 @@ def timestampPhotos():
     draw.text((x-1, y+1), get_datetime(fileList[n]), font=myfont, fill='black')  
     draw.text((x+1, y+1), get_datetime(fileList[n]), font=myfont, fill='black')  
     # text  
-    draw.text ( (x, y), get_datetime(fileList[n]), font=myfont, fill="white" )  
-    os.chdir(newdir)  
-    #i.save ( 'Frame_'+str(n+1)+'.jpg', quality=95 ) # save in new dir  
-    i.save(fileList[n], quality=95 ) # save in new dir 
-    os.chdir(maindir)  
+    draw.text ( (x, y), get_datetime(fileList[n]), font=myfont, fill="white" )
+
+    if OVERRIDE is False:
+      os.chdir(newdir)
+    
+    # save in new dir 
+    #i.save ( 'Frame_'+str(n+1)+'.jpg', quality=95 ) 
+    i.save(fileList[n], quality=95 ) 
+
+    if OVERRIDE is False:
+      os.chdir(maindir)  
+    
     #print str(n+1)+',',  
     logging.debug("Processing image %s"%(fileList[n]))
-  
-  #print 'Done.'  
-  #time.sleep(3)
 
   logging.info("end timestampPhotos()")
-
-# end timestamp stuff
 
 if __name__ == '__main__':
   main()
   takingPhotos()
   timestampPhotos()
   creatingTimelapse(TIMESTAMP_IMAGE_DIR)
-  #cleaning()
+  cleaning()
