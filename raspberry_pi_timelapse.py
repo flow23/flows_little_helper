@@ -25,6 +25,7 @@ TIMEBETWEEN = 15 # 4 pictures per minute
 global FILMLENGTH
 
 def main():
+  '''Main class'''
   global FRAMES
   global DEMO_MODE
   global OVERRIDE
@@ -65,7 +66,9 @@ def main():
   logging.info("end main()")
   
 def takingPhotos():
+  '''Takes image via raspistill'''
   FILMLENGTH = float(FRAMES / FPS_IN)
+
   logging.info("begin takingPhotos()")
   logging.debug("Frames: %s" % (FRAMES))
   logging.debug("FPS in: %s" % (FPS_IN))
@@ -89,6 +92,7 @@ def takingPhotos():
   logging.info("end takingPhotos()")
 
 def creatingTimelapse(image_dir):
+  '''Creates timelapse using avconv'''
   logging.debug("begin creatingTimelapse(%s)"%(image_dir))
 
   logging.info("Prefix: %s" % (PREFIX))
@@ -101,6 +105,7 @@ def creatingTimelapse(image_dir):
   logging.debug("end creatingTimelapse(%s)"%(image_dir))
 
 def scp():
+  '''Transfers timelapse via scp to another machine, ssh-keygen and ssh-copy-id needed'''
   logging.debug("begin scp()")
  
   logging.info("Transfering timelapse...")
@@ -109,6 +114,7 @@ def scp():
   logging.debug("end scp()")
 
 def cleaning():
+  '''Cleans all images and timelapse'''
   logging.debug("begin cleaning()")
 
   logging.info("Cleaning up...")
@@ -121,9 +127,8 @@ def cleaning():
   
   logging.debug("end cleaning()")
 
-#timestamp stuff
 def get_exif(fn):  
-  '''returns all EXIF data as dictionary'''
+  '''Returns all EXIF data as dictionary'''
   logging.debug("begin get_exif(%s)"%(fn))
 
   ret = {}  
@@ -136,11 +141,11 @@ def get_exif(fn):
   except:  
     pass
 
-  logging.debug("end get_exif(%s)"%(fn))
+  logging.debug("end get_exif(%s)"%(ret))
   return ret
 
 def get_datetime(fn):  
-  '''returns string of year, month, day, hour, minute and second'''  
+  '''Returns string of year, month, day, hour, minute and second'''  
   logging.info("begin get_datetime(%s)"%(fn))
 
   try:  
@@ -157,36 +162,37 @@ def get_datetime(fn):
   return datetime
 
 def timestampPhotos():
+  '''Adds timestamp to immage'''
   global TIMESTAMP_IMAGE_DIR
 
   logging.info("begin timestampPhotos()")
 
-  maindir = os.getcwd() # current working dir  
-  fileList = os.listdir( maindir )    # list of files in current dir  
+  mainDir = os.getcwd() # current working dir  
+  fileList = os.listdir(mainDir)    # list of files in current dir  
   fileList = [os.path.normcase(f) for f in fileList]   # normal case  
   # keep only files ending with .jpg  
   fileList = [ f for f in fileList if '.jpg' in os.path.splitext(f)[1]]  
   try:  
     i = Image.open(fileList[0])  
-    imgwidth = i.size[0]  # get width of first image  
-    imgheight = i.size[1]  
+    imgageWidth = i.size[0]  # get width of first image  
+    imgageHeight = i.size[1]  
   except:  
     pass  
   fontPath = "/usr/share/fonts/truetype/freefont/FreeSans.ttf" # font file path  
-  myfont = ImageFont.truetype ( fontPath, imgwidth/40 ) # load font and size  
-  (textw, texth) = myfont.getsize('00-00-0000 00:00')  # get size of timestamp  
-  x = imgwidth - textw - 50  # position of text  
-  y = imgheight - texth - 50
+  myFont = ImageFont.truetype ( fontPath, imageWidth/40 ) # load font and size  
+  (textWidth, textHeight) = myFont.getsize('00-00-0000 00:00')  # get size of timestamp  
+  x = imageWidth - textWidth - 50  # position of text  
+  y = imageHeight - textHeight - 50
 
   if OVERRIDE is False:
     print 'Now creating',str(len(fileList)),'frames in folder', \
       time.strftime('"Frames_%Y%m%d_%H%M%S".', time.localtime())  
     # make new dir  
-    newdir = os.path.join(maindir, time.strftime("Frames_%Y%m%d_%H%M%S", time.localtime()))
-    TIMESTAMP_IMAGE_DIR = newdir
-    os.mkdir(newdir)
+    newDir = os.path.join(mainDir, time.strftime("Frames_%Y%m%d_%H%M%S", time.localtime()))
+    TIMESTAMP_IMAGE_DIR = newDir
+    os.mkdir(newDir)
   else:
-    TIMESTAMP_IMAGE_DIR = maindir
+    TIMESTAMP_IMAGE_DIR = mainDir
     logging.debug("Now creating %s timestamp images in current folder"%(str(len(fileList))))
   
   # sorting file list alphabetical
@@ -197,24 +203,24 @@ def timestampPhotos():
     i = Image.open(fileList[n])  
     draw = ImageDraw.Draw ( i )  
     # thin border  
-    draw.text((x-1, y-1), get_datetime(fileList[n]), font=myfont, fill='black')  
-    draw.text((x+1, y-1), get_datetime(fileList[n]), font=myfont, fill='black')  
-    draw.text((x-1, y+1), get_datetime(fileList[n]), font=myfont, fill='black')  
-    draw.text((x+1, y+1), get_datetime(fileList[n]), font=myfont, fill='black')  
+    draw.text((x-1, y-1), get_datetime(fileList[n]), font=myFont, fill='black')  
+    draw.text((x+1, y-1), get_datetime(fileList[n]), font=myFont, fill='black')  
+    draw.text((x-1, y+1), get_datetime(fileList[n]), font=myFont, fill='black')  
+    draw.text((x+1, y+1), get_datetime(fileList[n]), font=myFont, fill='black')  
     # text  
-    draw.text ( (x, y), get_datetime(fileList[n]), font=myfont, fill="white" )
+    draw.text((x, y), get_datetime(fileList[n]), font=myFont, fill="white" )
 
+    # change directory
     if OVERRIDE is False:
-      os.chdir(newdir)
+      os.chdir(newDir)
     
-    # save in new dir 
-    #i.save ( 'Frame_'+str(n+1)+'.jpg', quality=95 ) 
+    # save image
     i.save(fileList[n], quality=95 ) 
 
+    # change direcotiry back
     if OVERRIDE is False:
-      os.chdir(maindir)  
+      os.chdir(mainDir)
     
-    #print str(n+1)+',',  
     logging.debug("Processing image %s"%(fileList[n]))
 
   logging.info("end timestampPhotos()")
