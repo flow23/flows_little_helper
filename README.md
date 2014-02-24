@@ -1,4 +1,9 @@
 flows_little_helper
 ===================
 
-flows little helper scripts
+# raspberry_pi_timelapse
+
+## Examples
+1. Run an 8 hour timelapse 
+**raspberry_pi_timelapse.py -l debug -f debug.log -x 1920 -o -c -s**
+

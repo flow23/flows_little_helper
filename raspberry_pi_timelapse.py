@@ -1,4 +1,4 @@
-# timelapse_flow.py -l debug -f debug.log -x 1920
+#!/usr/bin/env python
 
 import logging
 import optparse
@@ -6,7 +6,6 @@ import os
 import time
 import sys
 
-#timestamp
 from PIL import Image, ImageDraw, ImageFont  
 from PIL.ExifTags import TAGS  
 
@@ -18,7 +17,6 @@ LOGGING_LEVELS = {'critical': logging.CRITICAL,
                   'debug': logging.DEBUG}
 
 PREFIX = "flow_"
-TIMELAPSE_FILENAME = "timelapse.mp4"
 global FPS_IN
 global TIMESTAMP_IMAGE_DIR
 FPS_IN = 10
@@ -32,6 +30,7 @@ def main():
   global OVERRIDE
   global SCP
   global CLEANING
+  global TIMELAPSE_FILENAME
 
   # optparse is deprecated since 2.7, use argparse
   parser = optparse.OptionParser()
@@ -61,9 +60,8 @@ def main():
   OVERRIDE = options.override
   SCP = options.scp
   CLEANING = options.clean   
+  TIMELAPSE_FILENAME = time.strftime("timelapse_%Y%m%d_%H%M%S", time.localtime())  + ".mp4"
 
-  # Your program goes here.
-  # You can access command-line arguments using the args variable.
   logging.info("end main()")
   
 def takingPhotos():
@@ -81,7 +79,7 @@ def takingPhotos():
     logging.debug("Image number: %s" % imageNumber)
     if DEMO_MODE is False:
       try:
-        os.system("raspistill -o image%s.jpg" % (imageNumber))
+        os.system("raspistill -o %simage%s.jpg" % (PREFIX,imageNumber))
       except Exception, e:
         logging.error(e)
 
@@ -97,8 +95,8 @@ def creatingTimelapse(image_dir):
   logging.info("Timelapse filename: %s" % (TIMELAPSE_FILENAME))
   # Actual image is 2592x1944
   #os.system("nice -n 19 avconv -r %s -i %s/%simage%s.jpg -r %s -vcodec libx264 -crf 20 -g 15 -vf crop=2592:1458,scale=1280:720 %s"%(FPS_IN, image_dir, PREFIX, '%07d',FPS_OUT,TIMELAPSE_FILENAME))
-  # added -y to override latest timelapse if exists
-  os.system("nice -n 19 avconv -y -r %s -i %s/%simage%s.jpg -r %s -vcodec libx264 -crf 20 -g 15 -vf scale=1280:720 %s"%(FPS_IN, image_dir, PREFIX, '%07d',FPS_OUT,TIMELAPSE_FILENAME))
+  # Added -y to override latest timelapse if exists
+  os.system("nice -n 19 avconv -y -v quiet -r %s -i %s/%simage%s.jpg -r %s -vcodec libx264 -crf 20 -g 15 -vf scale=1280:720 %s"%(FPS_IN, image_dir, PREFIX, '%07d', FPS_OUT, TIMELAPSE_FILENAME))
 
   logging.debug("end creatingTimelapse(%s)"%(image_dir))
 
@@ -106,7 +104,7 @@ def scp():
   logging.debug("begin scp()")
  
   logging.info("Transfering timelapse...")
-  os.system("scp -i %s %s %s"%("/home/pi/.ssh/ida_dsa", TIMELAPSE_FILENAME, "user@ip:~/"))
+  os.system("scp -q -i %s %s %s"%("/home/pi/.ssh/id_dsa", TIMELAPSE_FILENAME, "user@0.0.0.0:/volume1/public/"))
   
   logging.debug("end scp()")
 
@@ -119,6 +117,7 @@ def cleaning():
     os.system("nice -n 19 rm -Rf %s"%(TIMESTAMP_IMAGE_DIR))
 
   os.system("nice -n 19 rm -Rf *image*.jpg")
+  os.system("nice -n 19 rm -Rf %s" % (TIMELAPSE_FILENAME))
   
   logging.debug("end cleaning()")
 
@@ -137,7 +136,7 @@ def get_exif(fn):
   except:  
     pass
 
-  logging.debug("end get_exif(%s) -> %s"%(fn,ret))
+  logging.debug("end get_exif(%s)"%(fn))
   return ret
 
 def get_datetime(fn):  
@@ -173,7 +172,7 @@ def timestampPhotos():
     imgheight = i.size[1]  
   except:  
     pass  
-  fontPath = "/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf" # font file path  
+  fontPath = "/usr/share/fonts/truetype/freefont/FreeSans.ttf" # font file path  
   myfont = ImageFont.truetype ( fontPath, imgwidth/40 ) # load font and size  
   (textw, texth) = myfont.getsize('00-00-0000 00:00')  # get size of timestamp  
   x = imgwidth - textw - 50  # position of text  
