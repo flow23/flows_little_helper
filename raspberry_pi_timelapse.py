@@ -141,7 +141,8 @@ def get_exif(fn):
   except:  
     pass
 
-  logging.debug("end get_exif(%s)"%(ret))
+  logging.debug("end get_exif()")
+  
   return ret
 
 def get_datetime(fn):  
@@ -159,6 +160,7 @@ def get_datetime(fn):
         str(date['minute']) # format timestamp 
 
   logging.info("end get_datetime(%s) -> %s"%(fn,datetime)) 
+  
   return datetime
 
 def timestampPhotos():
@@ -172,12 +174,13 @@ def timestampPhotos():
   fileList = [os.path.normcase(f) for f in fileList]   # normal case  
   # keep only files ending with .jpg  
   fileList = [ f for f in fileList if '.jpg' in os.path.splitext(f)[1]]  
-  try:  
+  try:
+    logging.debug("Current file: %s"%(fileList[0]))
     i = Image.open(fileList[0])  
-    imgageWidth = i.size[0]  # get width of first image  
-    imgageHeight = i.size[1]  
-  except:  
-    pass  
+    imageWidth = i.size[0]  # get width of first image  
+    imageHeight = i.size[1]  
+  except Exception, e:
+    logging.error(e)
   fontPath = "/usr/share/fonts/truetype/freefont/FreeSans.ttf" # font file path  
   myFont = ImageFont.truetype ( fontPath, imageWidth/40 ) # load font and size  
   (textWidth, textHeight) = myFont.getsize('00-00-0000 00:00')  # get size of timestamp  
