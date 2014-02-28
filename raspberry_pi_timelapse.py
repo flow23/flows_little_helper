@@ -23,6 +23,12 @@ FPS_IN = 10
 FPS_OUT = 24
 TIMEBETWEEN = 15 # 4 pictures per minute
 global FILMLENGTH
+global SCP_USER
+global SCP_HOST
+global SCP_DIRECTORY
+SCP_USER = "user"
+SCP_HOST = "0.0.0.0"
+SCP_DIRECTORY = "/volume1/public/"
 
 def main():
   '''Main class'''
@@ -32,6 +38,7 @@ def main():
   global SCP
   global CLEANING
   global TIMELAPSE_FILENAME
+  global DATE
 
   # optparse is deprecated since 2.7, use argparse
   parser = optparse.OptionParser()
@@ -62,6 +69,7 @@ def main():
   SCP = options.scp
   CLEANING = options.clean   
   TIMELAPSE_FILENAME = time.strftime("timelapse_%Y%m%d_%H%M%S", time.localtime())  + ".mp4"
+  DATE = time.strftime("%Y%m%d", time.localtime())
 
   logging.info("end main()")
   
@@ -70,6 +78,8 @@ def takingPhotos():
   FILMLENGTH = float(FRAMES / FPS_IN)
 
   logging.info("begin takingPhotos()")
+  logging.debug("Prefix: %s" % (PREFIX))
+  logging.debug("Date: %s" % (DATE))
   logging.debug("Frames: %s" % (FRAMES))
   logging.debug("FPS in: %s" % (FPS_IN))
   logging.debug("FPS out: %s" % (FPS_OUT))
@@ -82,7 +92,7 @@ def takingPhotos():
     logging.debug("Image number: %s" % imageNumber)
     if DEMO_MODE is False:
       try:
-        os.system("raspistill -o %simage%s.jpg" % (PREFIX,imageNumber))
+        os.system("raspistill -o %simage_%s_%s.jpg" % (PREFIX,DATE,imageNumber))
       except Exception, e:
         logging.error(e)
 
@@ -95,23 +105,22 @@ def creatingTimelapse(image_dir):
   '''Creates timelapse using avconv'''
   logging.debug("begin creatingTimelapse(%s)"%(image_dir))
 
-  logging.info("Prefix: %s" % (PREFIX))
   logging.info("Timelapse filename: %s" % (TIMELAPSE_FILENAME))
   # Actual image is 2592x1944
   #os.system("nice -n 19 avconv -r %s -i %s/%simage%s.jpg -r %s -vcodec libx264 -crf 20 -g 15 -vf crop=2592:1458,scale=1280:720 %s"%(FPS_IN, image_dir, PREFIX, '%07d',FPS_OUT,TIMELAPSE_FILENAME))
   # Added -y to override latest timelapse if exists
-  os.system("nice -n 19 avconv -y -v quiet -r %s -i %s/%simage%s.jpg -r %s -vcodec libx264 -crf 20 -g 15 -vf scale=1280:720 %s"%(FPS_IN, image_dir, PREFIX, '%07d', FPS_OUT, TIMELAPSE_FILENAME))
+  os.system("nice -n 19 avconv -y -v quiet -r %s -i %s/%simage_%s_%s.jpg -r %s -vcodec libx264 -crf 20 -g 15 -vf scale=1280:720 %s"%(FPS_IN, image_dir, PREFIX, DATE, '%07d', FPS_OUT, TIMELAPSE_FILENAME))
 
   logging.debug("end creatingTimelapse(%s)"%(image_dir))
 
-def scp():
+def scp(user,host,directory):
   '''Transfers timelapse via scp to another machine, ssh-keygen and ssh-copy-id needed'''
-  logging.debug("begin scp()")
+  logging.debug("begin scp(%s, %s, %s)"%(user, host, directory))
  
-  logging.info("Transfering timelapse...")
-  os.system("scp -q -i %s %s %s"%("/home/pi/.ssh/id_dsa", TIMELAPSE_FILENAME, "user@0.0.0.0:/volume1/public/"))
+  logging.info("Transfering %s"%(TIMELAPSE_FILENAME))
+  os.system("scp -q -i %s %s %s@%s:%s"%("/home/pi/.ssh/id_dsa", TIMELAPSE_FILENAME, user, host, directory))
   
-  logging.debug("end scp()")
+  logging.debug("end scp(%s, %s, %s)"%(user, host, directory))
 
 def cleaning():
   '''Cleans all images and timelapse'''
@@ -122,7 +131,7 @@ def cleaning():
   if OVERRIDE is False:
     os.system("nice -n 19 rm -Rf %s"%(TIMESTAMP_IMAGE_DIR))
 
-  os.system("nice -n 19 rm -Rf *image*.jpg")
+  os.system("nice -n 19 rm -Rf %simage_%s_*.jpg" % (PREFIX,DATE))
   os.system("nice -n 19 rm -Rf %s" % (TIMELAPSE_FILENAME))
   
   logging.debug("end cleaning()")
@@ -175,7 +184,7 @@ def timestampPhotos():
   # keep only files ending with .jpg  
   fileList = [ f for f in fileList if '.jpg' in os.path.splitext(f)[1]]  
   try:
-    logging.debug("Current file: %s"%(fileList[0]))
+    logging.debug("Getting image informatiom from file: %s"%(fileList[0]))
     i = Image.open(fileList[0])  
     imageWidth = i.size[0]  # get width of first image  
     imageHeight = i.size[1]  
@@ -202,16 +211,19 @@ def timestampPhotos():
   fileList.sort()
 
   for n in range(0,len(fileList)):  
+    logging.debug("Timestamping image %s"%(fileList[n]))
+
     # open image from list
     i = Image.open(fileList[n])  
     draw = ImageDraw.Draw ( i )  
-    # thin border  
-    draw.text((x-1, y-1), get_datetime(fileList[n]), font=myFont, fill='black')  
-    draw.text((x+1, y-1), get_datetime(fileList[n]), font=myFont, fill='black')  
-    draw.text((x-1, y+1), get_datetime(fileList[n]), font=myFont, fill='black')  
-    draw.text((x+1, y+1), get_datetime(fileList[n]), font=myFont, fill='black')  
+    # thin border
+    imageDatetimeFromEXIF = get_datetime(fileList[n])
+    draw.text((x-1, y-1), imageDatetimeFromEXIF, font=myFont, fill='black')  
+    draw.text((x+1, y-1), imageDatetimeFromEXIF, font=myFont, fill='black')  
+    draw.text((x-1, y+1), imageDatetimeFromEXIF, font=myFont, fill='black')  
+    draw.text((x+1, y+1), imageDatetimeFromEXIF, font=myFont, fill='black')  
     # text  
-    draw.text((x, y), get_datetime(fileList[n]), font=myFont, fill="white" )
+    draw.text((x, y), imageDatetimeFromEXIF, font=myFont, fill="white" )
 
     # change directory
     if OVERRIDE is False:
@@ -220,11 +232,9 @@ def timestampPhotos():
     # save image
     i.save(fileList[n], quality=95 ) 
 
-    # change direcotiry back
+    # change directory back
     if OVERRIDE is False:
       os.chdir(mainDir)
-    
-    logging.debug("Processing image %s"%(fileList[n]))
 
   logging.info("end timestampPhotos()")
 
@@ -234,7 +244,7 @@ if __name__ == '__main__':
   timestampPhotos()
   creatingTimelapse(TIMESTAMP_IMAGE_DIR)
   if SCP is True:
-    scp()
+    scp(SCP_USER, SCP_HOST, SCP_DIRECTORY)
 
   if CLEANING is True:
     cleaning()
