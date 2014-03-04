@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 
+''' Takes images from a camera and makes a timelapse out of it '''
+
+''' Takes stills and timestamps them to make a timelapse out of it.
+    Especially designed for rapsberry pi. Uses raspicam with
+    raspistill and avconv command line tools. '''
+
 import logging
 import optparse
 import os
@@ -8,6 +14,14 @@ import sys
 
 from PIL import Image, ImageDraw, ImageFont  
 from PIL.ExifTags import TAGS  
+
+__author__ = "Florian Wallburg"
+__copyright__ = "Copyright 2014, Florian Wallburg"
+__license__ = "GPL"
+__version__ = "0.5"
+__maintainer__ = "Florian Wallburg"
+__email__ = "florian.wallburg@web.de"
+__status__ = "Development"
 
 # CRITICAL < ERROR < WARNING < INFO < DEBUG < NOTSET
 LOGGING_LEVELS = {'critical': logging.CRITICAL,
@@ -23,6 +37,8 @@ FPS_IN = 10
 FPS_OUT = 24
 TIMEBETWEEN = 15 # 4 pictures per minute
 global FILMLENGTH
+
+''' SCP '''
 global SCP_USER
 global SCP_HOST
 global SCP_DIRECTORY
