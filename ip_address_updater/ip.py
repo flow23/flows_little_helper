@@ -36,7 +36,7 @@ try:
     logger.info('Public IP address %s', ip)
 
     config = configparser.ConfigParser()
-    config.read('ip.cfg')
+    config.read('%s/ip.cfg' % CWD)
 
     if (config['General']['IP'] != ip):
         logger.info('IP address change from %s to %s', config['General']['IP'], ip)
