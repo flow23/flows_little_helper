@@ -44,7 +44,7 @@ try:
         
         sendMail()
 
-        with open('ip.cfg', 'w') as configfile:
+        with open('%s/ip.cfg' % CWD, 'w') as configfile:
             config.write(configfile)
     else:
         logger.info('No IP address change')
