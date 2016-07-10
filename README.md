@@ -10,7 +10,7 @@ flows_little_helper
 ## ip_address_updater
 
 ### Dependencies
-1. sudo apt-get installpython3-request
+1. sudo apt-get install python3-requests
 2. git clone https://github.com/xbreezes/gmail-sender.git
 3. cd gmail-sender
 4. sudo python3 setup.py install
